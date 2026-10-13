@@ -98,3 +98,19 @@ and the client redials after the server drops it. Phone (MTS, 6 minutes): 2 conn
 
 Upstream: getmikan/Citrus#54 (the same code is in mihomo). Delete when the pinned core has
 `MaxConnsPerHost` on the TrustTunnel transport.
+
+### 0004 TrustTunnel: close HTTP/2 sessions that stop answering
+
+A session whose path goes silent (airplane mode, network switch) kept its streams blocked until
+a TCP timeout or a manual reconnect; after airplane mode the app sat with no traffic for 80 s.
+The patch turns on the transport's HTTP/2 health check: a session that receives nothing for
+10 s gets a PING and is closed if there is no answer within 5 s. Open streams on it fail and
+the caller redials them. HTTP/2 only; the QUIC path is unchanged.
+
+Test `transport/trusttunnel/client_ping_test.go`, with a proxy that freezes open connections: a
+frozen session is closed and the next stream gets a new connection; a pause that ends before
+the PING timeout keeps the session. Phone with 0003 + 0004: back on its own 2 to 7 s after
+airplane mode, one new connection each time.
+
+Upstream: getmikan/Citrus#54. Delete when the pinned core enables the HTTP/2 health check on
+the TrustTunnel transport.
