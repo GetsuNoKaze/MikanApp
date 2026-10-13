@@ -84,3 +84,17 @@ firefox fingerprints, older Xray) passes 32/32 on both the stock and the patched
 
 Upstream: mihomo PR #2983 proposed always sending the hybrid share and was closed. Delete when
 mihomo negotiates this itself.
+
+### 0003 TrustTunnel: one TLS connection per pooled client
+
+`max-connections` caps how many clients the TrustTunnel pool holds, but each client's
+`http.Transport` had no per-host limit. Streams started before the first HTTP/2 session is up
+each dialed their own TLS connection: 20 streams at start gave 20 connections with
+`max-connections: 1`. The patch sets `MaxConnsPerHost: 1` on that transport, so streams wait
+for the shared session; a dead session frees its slot on the next request.
+
+Test `transport/trusttunnel/client_conns_test.go`: 20 concurrent streams open one connection,
+and the client redials after the server drops it. Phone (MTS, 6 minutes): 2 connections.
+
+Upstream: getmikan/Citrus#54 (the same code is in mihomo). Delete when the pinned core has
+`MaxConnsPerHost` on the TrustTunnel transport.
