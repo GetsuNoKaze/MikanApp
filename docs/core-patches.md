@@ -91,10 +91,15 @@ mihomo negotiates this itself.
 `http.Transport` had no per-host limit. Streams started before the first HTTP/2 session is up
 each dialed their own TLS connection: 20 streams at start gave 20 connections with
 `max-connections: 1`. The patch sets `MaxConnsPerHost: 1` on that transport, so streams wait
-for the shared session; a dead session frees its slot on the next request.
+for the shared session; a dead session frees its slot on the next request. Because every stream
+of a cold client now waits for that one dial, the TCP dial and the TLS handshake are bounded
+together by `C.DefaultTLSTimeout`, as in the gun transport: a server that takes TCP and never
+answers TLS fails the dial instead of holding all the client's streams.
 
-Test `transport/trusttunnel/client_conns_test.go`: 20 concurrent streams open one connection,
-and the client redials after the server drops it. Phone (MTS, 6 minutes): 2 connections.
+Tests `transport/trusttunnel/client_conns_test.go` and `client_dial_test.go`: 20 concurrent
+streams open one connection, the client redials after the server drops it, and a dial to a
+server that never answers TLS fails within the timeout and leaves room for a fresh one. Phone
+(MTS, 6 minutes): 2 connections.
 
 Upstream: getmikan/Citrus#54 (the same code is in mihomo). Delete when the pinned core has
 `MaxConnsPerHost` on the TrustTunnel transport.
@@ -104,13 +109,15 @@ Upstream: getmikan/Citrus#54 (the same code is in mihomo). Delete when the pinne
 A session whose path goes silent (airplane mode, network switch) kept its streams blocked until
 a TCP timeout or a manual reconnect; after airplane mode the app sat with no traffic for 80 s.
 The patch turns on the transport's HTTP/2 health check: a session that receives nothing for
-10 s gets a PING and is closed if there is no answer within 5 s. Open streams on it fail and
+15 s gets a PING and is closed if there is no answer within 15 s, so a dead session goes about
+30 s after its last frame; the timeout leaves room for a PING ACK queued behind DATA on a busy
+uplink. Open streams on it fail and
 the caller redials them. HTTP/2 only; the QUIC path is unchanged.
 
 Test `transport/trusttunnel/client_ping_test.go`, with a proxy that freezes open connections: a
 frozen session is closed and the next stream gets a new connection; a pause that ends before
-the PING timeout keeps the session. Phone with 0003 + 0004: back on its own 2 to 7 s after
-airplane mode, one new connection each time.
+the PING timeout keeps the session. Phone with 0003 + 0004 at the earlier 10 s + 5 s:
+back on its own 2 to 7 s after airplane mode, one new connection each time.
 
 Upstream: getmikan/Citrus#54. Delete when the pinned core enables the HTTP/2 health check on
 the TrustTunnel transport.

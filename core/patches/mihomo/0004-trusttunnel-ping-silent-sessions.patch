@@ -1,20 +1,21 @@
 diff --git a/transport/trusttunnel/client.go b/transport/trusttunnel/client.go
-index 9ba5df8f..f4031db0 100644
+index 9ba5df8f..35423254 100644
 --- a/transport/trusttunnel/client.go
 +++ b/transport/trusttunnel/client.go
-@@ -27,2 +27,11 @@ type DialOptionsFunc func() []dialer.Option
+@@ -27,2 +27,12 @@ type DialOptionsFunc func() []dialer.Option
  
 +// A session that receives nothing for sessionPingInterval is pinged and closed
 +// if the ping is not answered within sessionPingTimeout, so a dead session is
-+// closed about 15 seconds after its last incoming frame. Open streams on it
-+// fail; redialing them is up to the caller. Variables so tests can shorten them.
++// closed about 30 seconds after its last incoming frame. Open streams on it
++// fail; redialing them is up to the caller. The timeout leaves room for a PING
++// ACK queued behind DATA on a busy uplink. Variables so tests can shorten them.
 +var (
-+	sessionPingInterval = 10 * time.Second
-+	sessionPingTimeout  = 5 * time.Second
++	sessionPingInterval = 15 * time.Second
++	sessionPingTimeout  = 15 * time.Second
 +)
 +
  type ClientOptions struct {
-@@ -110,2 +119,9 @@ func (c *Client) h2RoundTripper(tlsConfig *vmess.TLSConfig) {
+@@ -110,2 +120,9 @@ func (c *Client) h2RoundTripper(tlsConfig *vmess.TLSConfig) {
  		},
 +		// Ping a session that has gone quiet and close it if the ping is
 +		// not answered, so its streams fail and get redialed instead of
