@@ -25,8 +25,8 @@ modified freely: CI and the F-Droid recipe overwrite the embedded Root CA bundle
 `:core:revertCorePatches` undoes the series and runs on `clean`. The submodule therefore shows as
 modified while a build tree is set up; never commit the applied patches into the submodule.
 
-Tests that ship inside a patch run with the Go test task (`go test github.com/metacubex/mihomo/component/tls`
-from the `cfa` module), against the patched tree.
+Tests that ship inside a patch run with the Go test task (`go test github.com/metacubex/mihomo/component/tls
+github.com/metacubex/mihomo/transport/trusttunnel` from the `cfa` module), against the patched tree.
 
 ## Rules for a patch
 
@@ -102,7 +102,8 @@ server that never answers TLS fails within the timeout and leaves room for a fre
 (MTS, 6 minutes): 2 connections.
 
 Upstream: getmikan/Citrus#54 (the same code is in mihomo). Delete when the pinned core has
-`MaxConnsPerHost` on the TrustTunnel transport.
+both `MaxConnsPerHost` on the TrustTunnel transport and the timeout on its dial and handshake;
+with only the first, keep the timeout.
 
 ### 0004 TrustTunnel: close HTTP/2 sessions that stop answering
 
